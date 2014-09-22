@@ -7,28 +7,50 @@
 
 (add-hook 'before-save-hook #'gofmt-before-save)
 
-(defun underscore-to-camel ()
+(defun camelize-string (s)
+      "Convert under_score string S to CamelCase string."
+      (let* ((words (split-string s "_")))
+	(if (<= (length words) 1)
+	    s
+	  (mapconcat 'identity (mapcar
+				'(lambda (word) (capitalize (downcase word)))
+				words) ""))))
+
+(defun camelize-at-point ()
   "Convert underscore_case to CamelCase for the symbol at point."
   (interactive)
   (save-excursion
-    (let* 
-	((bounds (bounds-of-thing-at-point 'symbol))
+    (let* ((bounds (bounds-of-thing-at-point 'symbol))
 	 (start (car bounds))
 	 (end (cdr bounds))
 	 (buf (current-buffer))
-	 (out 
-	  (with-temp-buffer
-	    (insert-buffer-substring buf start end)
-	    (downcase-region (point-min) (point-max))
-	    (let* ((x (point-min)))
-	      (while (/= x (point-max))
-		(if (or (= x (point-min))
-			(= (char-before x) ?_))
-		    (upcase-region x (+ x 1)))
-		(setq x (1+ x))))
-	     (replace-string "_" "" nil (point-min) (point-max))
-	     (buffer-string))))
+	 (repl))
+      (setq repl (camelize-string (buffer-substring start end)))
       (delete-region start end)
       (goto-char start)
-      (insert out))))
+      (insert repl))))
 (global-set-key (kbd "C-M-u") 'underscore-to-camel)
+
+(defun camelize-region (start end)
+  "Camelize the whole region."
+  (interactive "r")
+  (save-excursion
+    (let* ((start (region-beginning))
+	   (end (region-end))
+	   (buf (current-buffer))
+	   (repl))
+      (message "start %d end %d" start end)
+      (setq repl
+	    (with-temp-buffer
+	      (insert-buffer-substring buf start end)
+	      (goto-char (point-min))
+	      (forward-word)
+	      (while (< (point) (point-max))
+		(progn
+		  (camelize-at-point)
+		  (forward-word)
+		  (forward-word)))
+	      (buffer-string)))
+      (delete-region start end)
+      (goto-char start)
+      (insert repl))))
